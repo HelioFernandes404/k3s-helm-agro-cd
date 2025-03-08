@@ -1,0 +1,100 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alertmanager
+  labels:
+    app: alertmanager
+    helm.sh/chart: alertmanager-0.1.0
+    app.kubernetes.io/instance: alertmanager-release
+    app.kubernetes.io/managed-by: Helm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alertmanager
+      release: alertmanager-release
+  template:
+    metadata:
+      labels:
+        app: alertmanager
+        release: alertmanager-release
+    spec:
+      containers:
+      - name: alertmanager
+        image: "prom/alertmanager:v0.24.0"
+        imagePullPolicy: IfNotPresent
+        args:
+          - "--config.file=/etc/alertmanager/config/config.yml"
+        ports:
+          - containerPort: 9093
+            name: http
+        volumeMounts:
+          - name: config-volume
+            mountPath: /etc/alertmanager/config
+          - name: data-volume
+            mountPath: /alertmanager
+        hostAliases:
+          - ip: "host-gateway"
+            hostnames:
+              - "host.docker.internal"
+      volumes:
+        - name: config-volume
+          configMap:
+            name: alertmanager-config
+            items:
+              - key: config.yml
+                path: config.yml
+        - name: data-volume
+          persistentVolumeClaim:
+            claimName: alertmanager-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager
+  labels:
+    app: alertmanager
+spec:
+  type: NodePort
+  ports:
+    - port: 9093
+      targetPort: 9093
+      nodePort: 32093
+      protocol: TCP
+      name: http
+  selector:
+    app: alertmanager
+    release: alertmanager-release
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-config
+  labels:
+    app: alertmanager
+data:
+  config.yml: |-
+    global:
+      resolve_timeout: 5m
+    route:
+      group_by: ['alertname']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 12h
+      receiver: 'default-receiver'
+    receivers:
+    - name: 'default-receiver'
+      email_configs:
+      - to: 'you@example.com'
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: alertmanager-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: "standard"
