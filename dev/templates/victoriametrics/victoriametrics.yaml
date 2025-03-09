@@ -1,77 +1,24 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: my-victoriametrics
+  name: victoria-metrics
   labels:
-    app: victoriametrics
-    release: my-release
+    app: victoria-metrics
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: victoriametrics
-      release: my-release
+      app: victoria-metrics
   template:
     metadata:
       labels:
-        app: victoriametrics
-        release: my-release
+        app: victoria-metrics
     spec:
       containers:
-      - name: victoriametrics
-        image: "victoriametrics/victoria-metrics:latest"
-        imagePullPolicy: IfNotPresent
-        ports:
-        - containerPort: 8428
-          name: http
+      - name: victoria-metrics
+        image: victoriametrics/victoria-metrics:v1.112.0
         args:
-        - "-promscrape.config=/etc/victoriametrics/prometheus.yml"
-        volumeMounts:
-        - name: config-volume
-          mountPath: /etc/victoriametrics
-      volumes:
-      - name: config-volume
-        configMap:
-          name: my-victoriametrics-config
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: my-victoriametrics
-  labels:
-    app: victoriametrics
-spec:
-  type: ClusterIP
-  ports:
-  - port: 8428
-    targetPort: 8428
-    protocol: TCP
-    name: http
-  selector:
-    app: victoriametrics
-    release: my-release
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: my-victoriametrics-config
-  labels:
-    app: victoriametrics
-data:
-  prometheus.yml: |-
-    scrape_configs:
-      - job_name: 'victoriametrics'
-        static_configs:
-          - targets: ['localhost:8428']
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: my-victoriametrics-pvc
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 8Gi
-  storageClassName: ""
+          - '-storageDataPath=/victoria-metrics-data'
+          - '-retentionPeriod=90d'
+        ports:
+          - containerPort: 8428
